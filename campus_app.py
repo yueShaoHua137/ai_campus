@@ -1,3 +1,46 @@
+"""
+Minimal Streamlit front-end for campus agent (main entry for Streamlit deployment).
+"""
+import os
+import requests
+import streamlit as st
+
+API_URL = os.environ.get("RAG_API_URL", "http://127.0.0.1:8000/ask")
+
+st.set_page_config(page_title="校园引导智能体", page_icon="🎓")
+st.title("🎓 校园引导智能体")
+
+if "history" not in st.session_state:
+    st.session_state.history = []
+
+with st.sidebar:
+    st.header("关于")
+    st.write("基于本地知识库的校园问答示例。")
+
+q = st.text_input("请输入问题：", "如何申请奖学金？")
+if st.button("提问") and q.strip():
+    st.session_state.history.append({"role": "user", "text": q})
+    try:
+        resp = requests.post(API_URL, json={"question": q}, timeout=20)
+        resp.raise_for_status()
+        data = resp.json()
+        answer = data.get("answer")
+        sources = data.get("source_documents", [])
+    except Exception as e:
+        answer = f"后端调用出错：{e}"
+        sources = []
+
+    st.session_state.history.append({"role": "assistant", "text": answer, "sources": sources})
+
+for msg in st.session_state.history:
+    if msg["role"] == "user":
+        st.markdown(f"**用户：** {msg['text']}")
+    else:
+        st.markdown(f"**助手：** {msg['text']}")
+        if msg.get("sources"):
+            st.markdown("**引用来源：**")
+            for s in msg.get("sources"):
+                st.markdown(f"- `{s.get('source')}`: {s.get('content')[:200].replace('\n',' ')}...")
 # rule_based_app.py - 基于规则的校园引导系统
 import streamlit as st
 import re
